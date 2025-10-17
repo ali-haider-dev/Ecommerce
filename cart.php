@@ -6,11 +6,11 @@
     $user_id = $_SESSION['user_id'] ?? 0;
     $current_cart_items = [];
     $total = 0;
-
+ 
     // Handle Remove Item - Must work for both DB and Session cart
     if (isset($_GET['remove'])) {
         $remove_id = (int)$_GET['remove'];
-
+            $redirect_url = $_SERVER['HTTP_REFERER']  ?? 'cart.php';
         if ($user_id > 0) {
             // Logged-in: Remove from database
             $stmt = $conn->prepare("DELETE FROM tbl_cart WHERE user_id = ? AND product_id = ?");
@@ -23,7 +23,7 @@
                 unset($_SESSION['cart'][$remove_id]);
             }
         }
-        header("Location: cart.php");
+        header("Location:". $redirect_url );
         exit();
     }
 

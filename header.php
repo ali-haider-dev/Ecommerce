@@ -1,22 +1,8 @@
  <?php
     include 'admin/db.php';
       $user_id = $_SESSION['user_id'] ?? 0;
-        if (isset($_GET['id'])) {
-        $remove_id = (int)$_GET['id'];
+        
 
-        if ($user_id > 0) {
-            // Logged-in: Remove from database
-            $stmt = $conn->prepare("DELETE FROM tbl_cart WHERE user_id = ? AND product_id = ?");
-            $stmt->bind_param("ii", $user_id, $remove_id);
-            $stmt->execute();
-            $stmt->close();
-        } else {
-            // Guest: Remove from session
-            if (isset($_SESSION['cart'][$remove_id])) {
-                unset($_SESSION['cart'][$remove_id]);
-            }
-        }
-    }
     // --- Fetch Categories ---
     $all_categories = [];
     $sql_categories = "SELECT id, category_name FROM tbl_categories ORDER BY category_name ASC";
@@ -191,7 +177,7 @@
                                                  <img src="admin/<?= htmlspecialchars($item['image']) ?>" alt="product">
                                              </a>
                                          </figure>
-                                         <a href="index.php?id=<?= $item['product_id'] ?>" class="btn-remove" title="Remove Product">
+                                         <a href="cart.php?remove=<?= $item['product_id'] ?>" class="btn-remove" title="Remove Product">
                                              <i class="icon-close"></i>
                                          </a>
                                      </div>

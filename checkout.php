@@ -1,5 +1,6 @@
 <?php
 include 'admin/db.php';
+require 'lib/credentials.php';
 print_r($_SESSION);
 // 1. SECURITY: Enforce Login for Checkout
 $user_id = $_SESSION['user_id'] ?? 0;
@@ -26,6 +27,7 @@ try {
         u.last_name, 
         u.email, 
         up.address, 
+        u.phone_number,
         up.city, 
         up.postcode
     FROM 
@@ -135,7 +137,7 @@ try {
                     <div class="col-sm-6">
                       <label>Last Name *</label>
                       <input type="text" class="form-control" name="lastname"
-                        value="<?= htmlspecialchars($user_data['lastname'] ?? '') ?>" required />
+                        value="<?= htmlspecialchars($user_data['last_name'] ?? '') ?>" required />
                     </div>
                   </div>
 
@@ -295,13 +297,16 @@ try {
   <script src="assets/js/owl.carousel.min.js"></script>
   <script src="assets/js/main.js"></script>
 
-  <script
-    src="https://www.paypal.com/sdk/js?client-id=AUOVyqA4VVr09Y0aGt6HFHb0VmLV-5sEcDqKOYI3VXN-U_B2zZ0AB2ZnGOJHfr3jTP_b5hNO1OAfxaJs&currency=USD"></script>
+  <script src="https://www.paypal.com/sdk/js?client-id=<?= PAYPAL_CLIENT_ID_PUBLIC ?>&currency=USD"></script>
   <script>
     $(document).ready(function () {
       const FINAL_TOTAL = <?= number_format($final_total, 2, '.', '') ?>;
       const COD_BUTTON = $('#cod-submit-button');
       const PAYPAL_CONTAINER = $('#paypal-button-container');
+
+      // FIXED: Proper initialization - show COD button by default since COD is checked
+      // COD_BUTTON.show();
+      // PAYPAL_CONTAINER.hide();
 
       // 1. Payment Method Toggle Logic
       $('.payment-method-radio').on('change', function () {
@@ -312,7 +317,11 @@ try {
           COD_BUTTON.show();
           PAYPAL_CONTAINER.hide();
         }
-      }).trigger('change'); // Initialize button visibility on load
+      });
+
+      // FIXED: Trigger change event AFTER defining the handler
+      // Check which payment method is selected on page load
+      $('.payment-method-radio:checked').trigger('change');
 
       // 2. PayPal Button Setup
       paypal.Buttons({
@@ -320,7 +329,6 @@ try {
           // Ensure the address fields are valid before creating the PayPal order
           if (!document.getElementById('checkout-form').checkValidity()) {
             alert('Please fill out all required billing and shipping fields.');
-            // Manually trigger the browser's validation UI
             document.getElementById('checkout-form').reportValidity();
             return false;
           }
@@ -328,15 +336,14 @@ try {
           return actions.order.create({
             purchase_units: [{
               amount: {
-                value: FINAL_TOTAL
+                value: FINAL_TOTAL.toFixed(2)
               },
-              description: 'Mello Order'
+              description: 'Molla Store Order'
             }]
           });
         },
         onApprove: function (data, actions) {
           return actions.order.capture().then(function (details) {
-            // Start processing on the server side
             processServerPayment(data.orderID, details);
           });
         },
@@ -344,25 +351,27 @@ try {
           alert('PayPal payment was cancelled.');
         },
         onError: function (err) {
-          console.error(err);
+          console.error('PayPal Error:', err);
           alert('An error occurred during the PayPal transaction. Please check the console.');
         }
       }).render('#paypal-button-container');
 
       // 3. Server-Side Finalization Function
       function processServerPayment(paypalOrderID, paypalDetails) {
-        // Collect all form data (including manually typed addresses)
+        // Collect all form data
         var formData = $('#checkout-form').serializeArray();
 
-        // Overwrite the hidden address strings with the CURRENT form input values
-        var currentShippingAddress = $('input[name="address1"]').val() + ', ' +
-          $('input[name="address2"]').val() + ', ' +
-          $('input[name="city"]').val() + ', ' +
-          $('input[name="state"]').val() + ', ' +
-          $('input[name="postcode"]').val() + ', ' +
-          $('input[name="country"]').val();
+        // Build address from current form values
+        var currentShippingAddress = [
+          $('input[name="address1"]').val(),
+          $('input[name="address2"]').val(),
+          $('input[name="city"]').val(),
+          $('input[name="state"]').val(),
+          $('input[name="postcode"]').val(),
+          $('input[name="country"]').val()
+        ].filter(function (val) { return val && val.trim() !== ''; }).join(', ');
 
-        // Append/Update custom data fields
+        // Add PayPal specific data
         formData.push({
           name: 'paypal_order_id',
           value: paypalOrderID
@@ -371,7 +380,6 @@ try {
           name: 'payment_method',
           value: 'paypal'
         });
-        // Send the freshly typed addresses, overriding the old hidden inputs
         formData.push({
           name: 'shipping_address',
           value: currentShippingAddress
@@ -381,8 +389,8 @@ try {
           value: currentShippingAddress
         });
 
-        // Temporarily disable buttons/show loading state
-        PAYPAL_CONTAINER.html('Processing Payment...');
+        // Show loading state
+        PAYPAL_CONTAINER.html('<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Processing Payment...</div>');
 
         $.ajax({
           url: 'functions/paypal_capture.php',
@@ -393,21 +401,20 @@ try {
             if (response.success) {
               window.location.href = 'order_confirm.php?order_id=' + response.order_id;
             } else {
-              window.location.href = 'checkout.php?error=1'; // Redirect with a generic error
+              alert('Order processing failed: ' + (response.message || 'Unknown error'));
+              window.location.href = 'checkout.php?error=1';
             }
           },
           error: function (xhr, status, error) {
-            // Log the entire XHR object for the most detail (optional)
             console.error("Full XHR Object:", xhr);
-
-            // Log the specific details for easier debugging
             console.error("AJAX Error Details:");
             console.error("HTTP Status Code:", xhr.status);
-            console.error("Status Text:", status); // This is the jQuery status text (e.g., 'error', 'timeout')
-            console.error("Server Error Message (if available):", error); // This is the HTTP status text (e.g., 'Internal Server Error')
-            console.error("Server Response/Output:", xhr.responseText); // <<< THIS IS THE MOST IMPORTANT PART
+            console.error("Status Text:", status);
+            console.error("Server Error Message:", error);
+            console.error("Server Response/Output:", xhr.responseText);
 
- 
+            alert('Failed to complete order. Please try Cash on Delivery or contact support.');
+            window.location.href = 'checkout.php?error=1';
           }
         });
       }

@@ -5,17 +5,21 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Initialize variables
 $Email = $Password = "";
+$FirstName = $LastName = $Phone = ""; // NEW: Added user name and phone
 $EmailError = $PasswordError = "";
+$FirstNameError = $LastNameError = $PhoneError = ""; // NEW: Added errors for new fields
 $LoginError = $SignupError = "";
 $show_modal = false;
 $active_tab = "signin";
 $login_success = false;
 $signup_success = false;
 
+// Regular expressions
 $EmailReg = '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/';
 $PasswordReg = '/^.{6,}$/';
+$PhoneReg = '/^\+?\d{7,15}$/'; // Basic validation: optional +, 7 to 15 digits
 
-// --- LOGIN ---
+// --- LOGIN --- (NO CHANGE HERE)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'login') {
     $Email = trim($_POST['email'] ?? '');
     $Password = $_POST['password'] ?? '';
@@ -31,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 
     if (!$EmailError && !$PasswordError) {
+        // Assuming $conn is available for database connection
         $stmt = $conn->prepare("SELECT id, password FROM tbl_users WHERE email = ?");
         $stmt->bind_param("s", $Email);
         $stmt->execute();
@@ -45,7 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $_SESSION['user_email'] = $Email;
                 $_SESSION['user_id'] = $user['id'];
                 
-                // FIXED: Use JavaScript redirect instead of PHP header
                 $login_success = true;
                 $show_modal = false;
             } else {
@@ -63,24 +67,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// --- SIGNUP ---
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'signup') {
+    // NEW: Collect First Name, Last Name, and Phone
+    $FirstName = trim($_POST['register_first_name'] ?? '');
+    $LastName = trim($_POST['register_last_name'] ?? '');
+    $Phone = trim($_POST['register_phone'] ?? '');
+
+    //  fields
     $Email = trim($_POST['register_email'] ?? '');
     $Password = $_POST['register_password'] ?? '';
 
+    // Validation for First Name
+    if (empty($FirstName)) {
+        $FirstNameError = "First Name is required.";
+    }
+
+    // Validation for Last Name
+    if (empty($LastName)) {
+        $LastNameError = "Last Name is required.";
+    }
+
+    //  Email Validation
     if (empty($Email)) {
         $EmailError = "Email is required.";
     } elseif (!preg_match($EmailReg, $Email)) {
         $EmailError = "Invalid email format.";
     }
 
+    //  Password Validation
     if (empty($Password)) {
         $PasswordError = "Password is required.";
     } elseif (!preg_match($PasswordReg, $Password)) {
         $PasswordError = "Password must be at least 6 characters.";
     }
+    
+    // NEW: Validation for Phone Number
+    if (empty($Phone)) {
+        $PhoneError = "Phone Number is required.";
+    } elseif (!preg_match($PhoneReg, $Phone)) { 
+        $PhoneError = "Invalid phone number format.";
+    }
 
-    if (!$EmailError && !$PasswordError) {
+
+    // Check all errors before DB interaction
+    if (!$FirstNameError && !$LastNameError && !$EmailError && !$PasswordError && !$PhoneError) {
         $stmt = $conn->prepare("SELECT id FROM tbl_users WHERE email = ?");
         $stmt->bind_param("s", $Email);
         $stmt->execute();
@@ -90,9 +121,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $SignupError = "Email already registered.";
         } else {
             $hash = password_hash($Password, PASSWORD_BCRYPT);
-            $insert = $conn->prepare("INSERT INTO tbl_users (email, password) VALUES (?, ?)");
-            $insert->bind_param("ss", $Email, $hash);
             
+            
+            $insert = $conn->prepare("INSERT INTO tbl_users (first_name, last_name, email, password, phone_number,designation) VALUES (?, ?, ?, ?, ?,?)");
+            $designation="website-user";
+            $insert->bind_param("ssssss", $FirstName, $LastName, $Email, $hash, $Phone,$designation);
+
             if ($insert->execute()) {
                 $user_id = $insert->insert_id;
                 
@@ -102,7 +136,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $_SESSION['user_email'] = $Email;
                 $_SESSION['user_id'] = $user_id;
                 
-                // FIXED: Use JavaScript redirect instead of PHP header
                 $signup_success = true;
                 $show_modal = false;
             } else {
@@ -113,7 +146,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $stmt->close();
     }
 
-    if ($EmailError || $PasswordError || $SignupError) {
+    // Check all possible errors to show the modal and activate the register tab
+    if ($FirstNameError || $LastNameError || $PhoneError || $EmailError || $PasswordError || $SignupError) {
         $show_modal = true;
         $active_tab = "register";
     }
@@ -203,11 +237,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 </div>
                             </div>
 
-                            <!-- REGISTER TAB -->
+                            <!-- REGISTER TAB (UPDATED) -->
                             <div class="tab-pane fade <?php echo $active_tab === 'register' ? 'show active' : ''; ?>"
                                 id="register" role="tabpanel" aria-labelledby="register-tab">
                                 <form method="POST" action="">
                                     <input type="hidden" name="action" value="signup">
+
+                                    <!-- NEW: First Name and Last Name in one row -->
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="register-first-name">First Name *</label>
+                                                <input type="text" class="form-control <?php echo $FirstNameError && $active_tab === 'register' ? 'is-invalid' : ''; ?>" 
+                                                    id="register-first-name" name="register_first_name"
+                                                    value="<?php echo $active_tab === 'register' ? htmlspecialchars($FirstName) : ''; ?>" required>
+                                                <?php if ($FirstNameError && $active_tab === 'register'): ?>
+                                                    <small class="text-danger d-block mt-1"><?php echo $FirstNameError; ?></small>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="register-last-name">Last Name *</label>
+                                                <input type="text" class="form-control <?php echo $LastNameError && $active_tab === 'register' ? 'is-invalid' : ''; ?>" 
+                                                    id="register-last-name" name="register_last_name"
+                                                    value="<?php echo $active_tab === 'register' ? htmlspecialchars($LastName) : ''; ?>" required>
+                                                <?php if ($LastNameError && $active_tab === 'register'): ?>
+                                                    <small class="text-danger d-block mt-1"><?php echo $LastNameError; ?></small>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Email address -->
                                     <div class="form-group">
                                         <label for="register-email">Email address *</label>
                                         <input type="email" class="form-control <?php echo $EmailError && $active_tab === 'register' ? 'is-invalid' : ''; ?>" 
@@ -217,6 +279,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                             <small class="text-danger d-block mt-1"><?php echo $EmailError; ?></small>
                                         <?php endif; ?>
                                     </div>
+
+                                    <!-- Password -->
                                     <div class="form-group">
                                         <label for="register-password">Password *</label>
                                         <input type="password" class="form-control <?php echo $PasswordError && $active_tab === 'register' ? 'is-invalid' : ''; ?>" 
@@ -228,6 +292,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                             <small class="text-danger d-block mt-1"><?php echo $SignupError; ?></small>
                                         <?php endif; ?>
                                     </div>
+                                    
+                                    <!-- NEW: Phone Number -->
+                                    <div class="form-group">
+                                        <label for="register-phone">Phone Number *</label>
+                                        <input type="text" class="form-control <?php echo $PhoneError && $active_tab === 'register' ? 'is-invalid' : ''; ?>" 
+                                            id="register-phone" name="register_phone"
+                                            value="<?php echo $active_tab === 'register' ? htmlspecialchars($Phone) : ''; ?>" required>
+                                        <?php if ($PhoneError && $active_tab === 'register'): ?>
+                                            <small class="text-danger d-block mt-1"><?php echo $PhoneError; ?></small>
+                                        <?php endif; ?>
+                                    </div>
+
+
                                     <div class="form-footer">
                                         <button type="submit" class="btn btn-outline-primary-2">
                                             <span>SIGN UP</span>
@@ -277,7 +354,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <?php endif; ?>
 
     <?php if ($login_success || $signup_success): ?>
-        // FIXED: Reload page after successful login/signup
+        // Reload page after successful login/signup
         $(document).ready(function () {
             // Close modal and reload page
             $('#signin-modal').modal('hide');
