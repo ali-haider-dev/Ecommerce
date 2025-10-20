@@ -305,8 +305,8 @@ try {
       const PAYPAL_CONTAINER = $('#paypal-button-container');
 
       // FIXED: Proper initialization - show COD button by default since COD is checked
-      // COD_BUTTON.show();
-      // PAYPAL_CONTAINER.hide();
+      COD_BUTTON.show();
+      PAYPAL_CONTAINER.hide();
 
       // 1. Payment Method Toggle Logic
       $('.payment-method-radio').on('change', function () {
