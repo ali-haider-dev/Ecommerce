@@ -27,7 +27,7 @@
         exit();
     }
 
-    // --- Fetch Cart Data (Source of Truth) ---
+
 
     if ($user_id > 0) {
         // 1. Logged-in User: Fetch cart from DB (similar to header.php but uses proper JOIN and prepared statements)
@@ -43,7 +43,7 @@
             $subtotal = $row['price'] * $row['quantity'];
             $total += $subtotal;
 
-            // Prepare attachment data (assuming it's a JSON array in the DB as your original cart.php suggested)
+            // Prepare attachment data 
             $attachments = json_decode($row['attachments'], true) ?: [];
             $row['attachments'] = $attachments;
 

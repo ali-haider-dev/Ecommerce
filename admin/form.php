@@ -1,6 +1,6 @@
 <?php
 require_once 'db.php';
-session_start();
+// session_start();
 
 // Redirect if already logged in
 if (isset($_SESSION["LoginNormal"])) {

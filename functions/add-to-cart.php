@@ -1,19 +1,18 @@
 <?php
 session_start();
-include '../admin/db.php'; // Adjust path as needed
+include '../admin/db.php'; 
 
 // Check for product ID
 if (!isset($_GET['id']) || empty($_GET['id'])) {
-    // Redirect back to the homepage or show an error
+ 
     header('Location: ../index.php');
     exit();
 }
 
 $product_id = (int)$_GET['id'];
-$user_id = $_SESSION['user_id'] ?? 0; // Assuming user_id is stored in the session upon login
-$quantity = 1; // Default to adding 1 item
+$user_id = $_SESSION['user_id'] ?? 0; 
+$quantity = 1; 
 
-// 1. Check if the user is logged in (has a user_id)
 if ($user_id > 0) {
 
     $stmt = $conn->prepare("SELECT id, quantity FROM tbl_cart WHERE user_id = ? AND product_id = ?");

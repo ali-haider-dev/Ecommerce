@@ -1,6 +1,6 @@
 <?php
 require_once 'db.php';
-session_start();
+// session_start();
 
 if (!isset($_SESSION["LoginAdmin"])) {
     header("Location: form.php", true, 302);

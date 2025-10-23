@@ -42,6 +42,11 @@
                 <i class="fa-solid fa-fw fa-tachometer-alt"></i>
                 <span>Products</span></a>
         </li>
+        <li class="nav-item active">
+            <a class="nav-link" href="reports.php">
+                <i class="fa-solid fa-fw fa-tachometer-alt"></i>
+                <span>Reports</span></a>
+        </li>
         <!-- Heading -->
         <!-- <div class="sidebar-heading">
                 Interface
